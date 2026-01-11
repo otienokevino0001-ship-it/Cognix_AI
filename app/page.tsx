@@ -1,32 +1,54 @@
+"use client";
+
+import { useState } from "react";
+
 export default function Home() {
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function sendPrompt() {
+    if (!input.trim()) return;
+
+    setLoading(true);
+    setResponse("");
+
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: input }),
+    });
+
+    const data = await res.json();
+    setResponse(data.reply);
+    setLoading(false);
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: "1rem",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
-      }}
-    >
-      <h1>Next.js is running</h1>
+    <main style={{ padding: "2rem", maxWidth: 600, margin: "auto" }}>
+      <h1>AI Assistant</h1>
 
-      <p>
-        You are developing on a mobile environment using Termux.
-      </p>
+      <textarea
+        rows={4}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="Ask something..."
+        style={{ width: "100%", padding: "0.5rem" }}
+      />
 
-      <code
-        style={{
-          padding: "0.5rem 1rem",
-          background: "#111",
-          color: "#0f0",
-          borderRadius: "6px",
-        }}
+      <button
+        onClick={sendPrompt}
+        disabled={loading}
+        style={{ marginTop: "1rem" }}
       >
-        app/page.tsx
-      </code>
+        {loading ? "Thinking..." : "Send"}
+      </button>
+
+      {response && (
+        <pre style={{ marginTop: "1rem", whiteSpace: "pre-wrap" }}>
+          {response}
+        </pre>
+      )}
     </main>
   );
 }
