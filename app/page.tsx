@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function Assistant() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to bottom on new message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function sendMessage() {
     if (!input.trim()) return;
 
     const userMessage = input;
-    setMessages((prev) => [...prev, `You: ${userMessage}`]);
+    setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setInput("");
     setLoading(true);
 
@@ -21,44 +27,105 @@ export default function Assistant() {
       body: JSON.stringify({ prompt: userMessage }),
     });
 
-    const data = await res.json();
-    setMessages((prev) => [...prev, `AI: ${data.reply}`]);
+    if (!res.body) return;
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let aiText = "";
+
+    setMessages((prev) => [...prev, { role: "ai", text: "" }]);
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      aiText += decoder.decode(value);
+
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1].text = aiText;
+        return copy;
+      });
+    }
+
     setLoading(false);
   }
 
   return (
-    <main style={{ maxWidth: 700, margin: "auto", padding: "2rem" }}>
-      <h1>Web AI Assistant</h1>
+    <main
+      style={{
+        maxWidth: 600,
+        margin: "auto",
+        padding: "2rem",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
+      }}
+    >
+      <h1 style={{ textAlign: "center", marginBottom: "1rem" }}>
+        Web AI Assistant
+      </h1>
 
       <div
         style={{
           border: "1px solid #ccc",
+          borderRadius: 8,
           padding: "1rem",
-          minHeight: 300,
-          marginBottom: "1rem",
+          minHeight: 400,
           overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
+          backgroundColor: "#f9f9f9",
         }}
       >
         {messages.map((m, i) => (
-          <p key={i}>{m}</p>
+          <div
+            key={i}
+            style={{
+              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              backgroundColor: m.role === "user" ? "#0070f3" : "#e5e5ea",
+              color: m.role === "user" ? "#fff" : "#000",
+              padding: "0.6rem 1rem",
+              borderRadius: 16,
+              maxWidth: "80%",
+              wordBreak: "break-word",
+            }}
+          >
+            {m.text}
+          </div>
         ))}
-        {loading && <p>AI is thinking…</p>}
+        <div ref={messagesEndRef} />
       </div>
 
-      <textarea
-        rows={3}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Ask anything…"
-        style={{ width: "100%", padding: "0.5rem" }}
-      />
-
-      <button
-        onClick={sendMessage}
-        style={{ marginTop: "1rem", padding: "0.5rem 1rem" }}
-      >
-        Send
-      </button>
+      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
+        <textarea
+          rows={2}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type your message..."
+          style={{
+            flex: 1,
+            padding: "0.5rem",
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            resize: "none",
+          }}
+          disabled={loading}
+        />
+        <button
+          onClick={sendMessage}
+          disabled={loading || !input.trim()}
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: 8,
+            border: "none",
+            backgroundColor: "#0070f3",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "..." : "Send"}
+        </button>
+      </div>
     </main>
   );
 }
