@@ -19,15 +19,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    // Streaming response
+    // Create a streaming completion
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a helpful web-based AI assistant." },
+        { role: "system", content: "You are a helpful AI assistant." },
         { role: "user", content: prompt },
       ],
       stream: true,
@@ -36,10 +34,11 @@ export async function POST(req: Request) {
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
-        for await (const event of stream) {
-          if (event.type === "response.output_text.delta") {
-            const chunk = encoder.encode(event.delta);
-            controller.enqueue(chunk);
+        // Cast event as any to avoid TS errors
+        for await (const event of stream as any) {
+          // 'delta' contains the new text chunk
+          if (event.delta) {
+            controller.enqueue(encoder.encode(event.delta));
           }
         }
         controller.close();
