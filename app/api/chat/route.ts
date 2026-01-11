@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: Request) {
+  // Guard: prevent build-time or runtime crashes
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "OPENAI_API_KEY is not configured" },
+      { status: 500 }
+    );
+  }
+
   try {
     const { prompt } = await req.json();
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: "Invalid prompt" },
         { status: 400 }
       );
     }
+
+    // Lazy initialization (CRITICAL for Netlify)
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
